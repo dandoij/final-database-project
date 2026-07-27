@@ -26,9 +26,11 @@ def customer_menu(conn):
             ("1", "Browse all products"),
             ("2", "Search products by name"),
             ("3", "Browse products by category"),
-            ("4", "Register a credit card"),
-            ("5", "View my credit cards"),
-            ("6", "Switch customer"),
+            ("4", "Shop - build a cart and check out"),
+            ("5", "View order history"),
+            ("6", "Register a credit card"),
+            ("7", "View my credit cards"),
+            ("8", "Switch customer"),
             ("0", "Back to role selection"),
         ])
         if choice == "0":
@@ -40,10 +42,14 @@ def customer_menu(conn):
         elif choice == "3":
             customer_ops.filter_products_by_category(conn)
         elif choice == "4":
-            customer_ops.register_credit_card(conn, customer)
+            customer_ops.shop(conn, customer)
         elif choice == "5":
-            customer_ops.show_cards(conn, customer)
+            customer_ops.view_order_history(conn, customer)
         elif choice == "6":
+            customer_ops.register_credit_card(conn, customer)
+        elif choice == "7":
+            customer_ops.show_cards(conn, customer)
+        elif choice == "8":
             switched = customer_ops.select_customer(conn)
             if switched is not None:
                 customer = switched

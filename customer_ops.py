@@ -194,6 +194,248 @@ def register_credit_card(conn, customer):
     print(f"\n  Registered {card_type} ending {last_four} as card #{card_id}.")
 
 
+def shop(conn, customer):
+    cart = {}
+    while True:
+        choice = ui.prompt_menu(f"Cart ({sum(cart.values())} items)", [
+            ("1", "Add a product to the cart"),
+            ("2", "View the cart"),
+            ("3", "Remove a product from the cart"),
+            ("4", "Checkout"),
+            ("0", "Leave the cart"),
+        ])
+        if choice == "0":
+            if cart and not ui.confirm("Leaving discards the cart. Continue?"):
+                continue
+            return
+        if choice == "1":
+            add_to_cart(conn, cart)
+        elif choice == "2":
+            show_cart(conn, cart)
+        elif choice == "3":
+            remove_from_cart(conn, cart)
+        elif choice == "4":
+            if checkout(conn, customer, cart):
+                return
+
+
+def add_to_cart(conn, cart):
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT product_id, name, category, price, stock_quantity "
+            "FROM Product ORDER BY name"
+        )
+        products = cur.fetchall()
+
+    print("\nPick a product to add:")
+    choice = ui.choose_row(
+        ["ID", "Name", "Category", "Price", "Stock"],
+        [(p[0], p[1], p[2], ui.money(p[3]), p[4]) for p in products],
+        prompt="Select product #",
+    )
+    if choice is None:
+        return
+
+    product = next(p for p in products if p[0] == choice[0])
+    quantity = ui.prompt_int(f"Quantity of {product[1]}", minimum=1)
+
+    already = cart.get(product[0], 0)
+    cart[product[0]] = already + quantity
+
+    if cart[product[0]] > product[4]:
+        print(
+            f"\n  Heads up: only {product[4]} in stock and the cart now holds "
+            f"{cart[product[0]]}. Checkout will refuse this order."
+        )
+    else:
+        print(f"\n  Cart now holds {cart[product[0]]} x {product[1]}.")
+
+
+def show_cart(conn, cart):
+    lines = _cart_lines(conn, cart)
+    print("\nCart contents:")
+    ui.print_table(
+        ["ID", "Product", "Qty", "Price", "Line total"],
+        [
+            (l[0], l[1], l[3], ui.money(l[2]), ui.money(l[2] * l[3]))
+            for l in lines
+        ],
+        empty_message="The cart is empty.",
+    )
+    if lines:
+        print(f"\n  Cart total: {ui.money(sum(l[2] * l[3] for l in lines))}")
+
+
+def remove_from_cart(conn, cart):
+    lines = _cart_lines(conn, cart)
+    if not lines:
+        print("\n  The cart is empty.")
+        return
+
+    print("\nPick a product to remove:")
+    choice = ui.choose_row(
+        ["ID", "Product", "Qty"],
+        [(l[0], l[1], l[3]) for l in lines],
+        prompt="Remove #",
+    )
+    if choice is None:
+        return
+
+    del cart[choice[0]]
+    print(f"\n  Removed {choice[1]} from the cart.")
+
+
+def checkout(conn, customer, cart):
+    if not cart:
+        print("\n  The cart is empty, so there is nothing to check out.")
+        return False
+
+    customer_id = customer[0]
+    cards = list_cards(conn, customer_id)
+    if not cards:
+        print(
+            f"\n  {customer[1]} {customer[2]} has no credit card on file. "
+            "Register a card before checking out."
+        )
+        return False
+
+    print("\nPay with which card?")
+    card = ui.choose_row(
+        ["Card", "Type", "Number", "Expires"],
+        [(c[0], c[1], f"**** {c[2]}", f"{c[3]:02d}/{c[4]}") for c in cards],
+        prompt="Select card #",
+    )
+    if card is None:
+        return False
+    card_id = card[0]
+
+    conn.autocommit = False
+    try:
+        with conn.cursor() as cur:
+            lines = []
+            shortages = []
+            for product_id, quantity in cart.items():
+                cur.execute(
+                    "SELECT name, price, stock_quantity FROM Product "
+                    "WHERE product_id = %s",
+                    (product_id,),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    shortages.append(f"product #{product_id} no longer exists")
+                    continue
+                name, price, stock = row
+                if quantity > stock:
+                    shortages.append(
+                        f"{name}: asked for {quantity}, only {stock} in stock"
+                    )
+                lines.append((product_id, name, price, quantity))
+
+            if shortages:
+                conn.rollback()
+                print("\n  Order cancelled. Nothing was charged or changed:")
+                for problem in shortages:
+                    print(f"    - {problem}")
+                return False
+
+            total = sum(price * quantity for _, _, price, quantity in lines)
+
+            cur.execute(
+                "INSERT INTO Purchase (total_amount, customer_id, card_id) "
+                "VALUES (%s, %s, %s) RETURNING purchase_id",
+                (total, customer_id, card_id),
+            )
+            purchase_id = cur.fetchone()[0]
+
+            for product_id, _, price, quantity in lines:
+                cur.execute(
+                    "INSERT INTO PurchaseItem (purchase_id, product_id, quantity, unit_price) "
+                    "VALUES (%s, %s, %s, %s)",
+                    (purchase_id, product_id, quantity, price),
+                )
+                cur.execute(
+                    "UPDATE Product SET stock_quantity = stock_quantity - %s "
+                    "WHERE product_id = %s",
+                    (quantity, product_id),
+                )
+
+        conn.commit()
+    except psycopg2.Error as exc:
+        conn.rollback()
+        print(f"\n  Order failed, nothing was changed: {str(exc).strip().splitlines()[0]}")
+        return False
+    finally:
+        conn.autocommit = True
+
+    print(f"\n  Order #{purchase_id} confirmed - paid with {card[1]} {card[2]}")
+    ui.print_table(
+        ["Product", "Qty", "Unit price", "Line total"],
+        [(name, qty, ui.money(price), ui.money(price * qty))
+         for _, name, price, qty in lines],
+    )
+    print(f"\n  Total charged: {ui.money(total)}")
+
+    cart.clear()
+    return True
+
+
+def view_order_history(conn, customer):
+    while True:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT purchase_id, purchase_date, status, total_amount "
+                "FROM Purchase WHERE customer_id = %s ORDER BY purchase_date DESC",
+                (customer[0],),
+            )
+            purchases = cur.fetchall()
+
+        print(f"\nOrder history for {customer[1]} {customer[2]}:")
+        choice = ui.choose_row(
+            ["Order", "Date", "Status", "Total"],
+            [
+                (p[0], p[1].strftime("%Y-%m-%d %H:%M"), p[2], ui.money(p[3]))
+                for p in purchases
+            ],
+            prompt="View details for order #",
+            empty_message="No orders yet.",
+        )
+        if choice is None:
+            return
+
+        show_order_details(conn, choice[0])
+
+
+def show_order_details(conn, purchase_id):
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT p.name, pi.quantity, pi.unit_price "
+            "FROM PurchaseItem pi JOIN Product p ON p.product_id = pi.product_id "
+            "WHERE pi.purchase_id = %s ORDER BY p.name",
+            (purchase_id,),
+        )
+        items = cur.fetchall()
+
+    print(f"\nOrder #{purchase_id} line items:")
+    ui.print_table(
+        ["Product", "Qty", "Unit price", "Line total"],
+        [(i[0], i[1], ui.money(i[2]), ui.money(i[1] * i[2])) for i in items],
+    )
+    print(f"\n  Order total: {ui.money(sum(i[1] * i[2] for i in items))}")
+
+
+def _cart_lines(conn, cart):
+    if not cart:
+        return []
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT product_id, name, price FROM Product WHERE product_id = ANY(%s) "
+            "ORDER BY name",
+            (list(cart.keys()),),
+        )
+        return [(p[0], p[1], p[2], cart[p[0]]) for p in cur.fetchall()]
+
+
 def _print_products(products, empty_message="No products found."):
     ui.print_table(
         ["ID", "Name", "Category", "Price", "Stock"],
