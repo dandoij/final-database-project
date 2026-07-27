@@ -1,3 +1,4 @@
+import customer_ops
 import db
 import ui
 
@@ -15,15 +16,43 @@ def show_database_status(conn):
 
 
 def customer_menu(conn):
+    customer = customer_ops.select_customer(conn)
+    if customer is None:
+        return
+
     while True:
-        choice = ui.prompt_menu("Customer Menu", [
-            ("1", "Database status"),
+        title = f"Customer Menu - {customer[1]} {customer[2]}"
+        choice = ui.prompt_menu(title, [
+            ("1", "Browse all products"),
+            ("2", "Search products by name"),
+            ("3", "Browse products by category"),
+            ("4", "Shop - build a cart and check out"),
+            ("5", "View order history"),
+            ("6", "Register a credit card"),
+            ("7", "View my credit cards"),
+            ("8", "Switch customer"),
             ("0", "Back to role selection"),
         ])
         if choice == "0":
             return
         if choice == "1":
-            show_database_status(conn)
+            customer_ops.browse_products(conn)
+        elif choice == "2":
+            customer_ops.search_products_by_name(conn)
+        elif choice == "3":
+            customer_ops.filter_products_by_category(conn)
+        elif choice == "4":
+            customer_ops.shop(conn, customer)
+        elif choice == "5":
+            customer_ops.view_order_history(conn, customer)
+        elif choice == "6":
+            customer_ops.register_credit_card(conn, customer)
+        elif choice == "7":
+            customer_ops.show_cards(conn, customer)
+        elif choice == "8":
+            switched = customer_ops.select_customer(conn)
+            if switched is not None:
+                customer = switched
 
 
 def staff_menu(conn):
