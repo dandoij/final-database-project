@@ -1,5 +1,6 @@
 import customer_ops
 import db
+import queries
 import staff_ops
 import ui
 
@@ -31,7 +32,8 @@ def customer_menu(conn):
             ("5", "View order history"),
             ("6", "Register a credit card"),
             ("7", "View my credit cards"),
-            ("8", "Switch customer"),
+            ("8", "SQL reports"),
+            ("9", "Switch customer"),
             ("0", "Back to role selection"),
         ])
         if choice == "0":
@@ -51,6 +53,8 @@ def customer_menu(conn):
         elif choice == "7":
             customer_ops.show_cards(conn, customer)
         elif choice == "8":
+            queries.report_menu(conn)
+        elif choice == "9":
             switched = customer_ops.select_customer(conn)
             if switched is not None:
                 customer = switched
@@ -69,7 +73,8 @@ def staff_menu(conn):
             ("3", "Update a product's price or stock"),
             ("4", "Low-stock report"),
             ("5", "View all orders"),
-            ("6", "Switch staff member"),
+            ("6", "SQL reports"),
+            ("7", "Switch staff member"),
             ("0", "Back to role selection"),
         ])
         if choice == "0":
@@ -85,6 +90,8 @@ def staff_menu(conn):
         elif choice == "5":
             staff_ops.view_all_orders(conn)
         elif choice == "6":
+            queries.report_menu(conn)
+        elif choice == "7":
             switched = staff_ops.select_staff(conn)
             if switched is not None:
                 staff = switched
