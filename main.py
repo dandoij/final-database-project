@@ -1,5 +1,6 @@
 import customer_ops
 import db
+import staff_ops
 import ui
 
 TABLES = ["Customer", "Staff", "Product", "CreditCard", "Purchase", "PurchaseItem"]
@@ -56,15 +57,37 @@ def customer_menu(conn):
 
 
 def staff_menu(conn):
+    staff = staff_ops.select_staff(conn)
+    if staff is None:
+        return
+
     while True:
-        choice = ui.prompt_menu("Staff Menu", [
-            ("1", "Database status"),
+        title = f"Staff Menu - {staff[1]} {staff[2]}"
+        choice = ui.prompt_menu(title, [
+            ("1", "View all products"),
+            ("2", "Add a product"),
+            ("3", "Update a product's price or stock"),
+            ("4", "Low-stock report"),
+            ("5", "View all orders"),
+            ("6", "Switch staff member"),
             ("0", "Back to role selection"),
         ])
         if choice == "0":
             return
         if choice == "1":
-            show_database_status(conn)
+            customer_ops.browse_products(conn)
+        elif choice == "2":
+            staff_ops.add_product(conn, staff)
+        elif choice == "3":
+            staff_ops.update_product(conn)
+        elif choice == "4":
+            staff_ops.low_stock_report(conn)
+        elif choice == "5":
+            staff_ops.view_all_orders(conn)
+        elif choice == "6":
+            switched = staff_ops.select_staff(conn)
+            if switched is not None:
+                staff = switched
 
 
 def main():
