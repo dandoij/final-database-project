@@ -5,7 +5,7 @@ backend.
 
 Customers browse products, register credit cards, and place orders. Staff add and
 update products, watch inventory, and review orders. Python 3.10+ with psycopg2,
-direct parameterized SQL, no ORM.
+direct parameterized SQL.
 
 ---
 

@@ -1,12 +1,8 @@
--- The three required SQL queries, runnable on their own:
---     psql -U postgres -d shopdb -f queries.sql
--- Each one is also wired into the application under "SQL Reports".
-
+-- The three SQL queries required 
 
 -- 1. Multi-table join across four tables: Customer -> Purchase -> PurchaseItem ->
 --    Product. Shows the names of customers along with the names of the products
---    they purchased, limited to products priced above $100. The application
---    supplies the price as a parameter instead of the literal used here.
+--    they purchased, limited to products priced above $100.\
 SELECT c.first_name || ' ' || c.last_name AS customer_name,
        p.name AS product_name,
        p.price,
@@ -35,8 +31,6 @@ ORDER BY revenue DESC;
 
 
 -- 3. Correlated subquery: products that have never appeared in any purchase.
---    NOT EXISTS stops at the first matching line item, and reads as the question
---    being asked - "is there no purchase item for this product?"
 SELECT p.product_id,
        p.name,
        p.category,
