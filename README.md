@@ -7,6 +7,8 @@ Customers browse products, register credit cards, and place orders. Staff add an
 update products, watch inventory, and review orders. Python 3.10+ with psycopg2,
 direct parameterized SQL.
 
+**All documentation is held in the `docs/` folder, including requirements, ER Diagrams, and Schemas.**
+
 ---
 
 ## Setup
