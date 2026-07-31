@@ -39,12 +39,11 @@ psql -U postgres -d shopdb -f reset.sql
 <details>
 <summary>If you need PostgreSQL or Python installed:</summary>
 
-**PostgreSQL** — installer from <https://www.postgresql.org/download/windows/>, or
-`winget install -e --id PostgreSQL.PostgreSQL.17`. Add its `bin` directory (e.g.
-`C:\Program Files\PostgreSQL\17\bin`) to `PATH` so `psql` and `createdb` work, then open
+**PostgreSQL** - installer from <https://www.postgresql.org/download/windows/>, or
+`winget install -e --id PostgreSQL.PostgreSQL.17`. Add its `bin` directory to `PATH` so `psql` and `createdb` work, then open
 a new terminal.
 
-**Python** — installer from <https://www.python.org/downloads/windows/>, checking "Add
+**Python** - installer from <https://www.python.org/downloads/windows/>, checking "Add
 python.exe to PATH".
 
 If PowerShell blocks `venv\Scripts\activate`, run
